@@ -14,18 +14,30 @@ deploymentStrategy: {}
 ##
 # schedulerName:
 
+## Is this deployment for OpenShift? If so, we help with SCCs
+OpenShift:
+  enabled: false
+  createSCC: true
+
 image:
   repository: sonarqube
   tag: 8.2-community
+  pullPolicy: IfNotPresent
   # If using a private repository, the name of the imagePullSecret to use
   # pullSecret: my-repo-secret
 
 # Set security context for sonarqube pod
 securityContext:
-  fsGroup: 999
+  fsGroup: 1000
+
+# Set security context for sonarqube container
+containerSecurityContext:
+  # Sonarqube dockerfile creates sonarqube user as UID and GID 1000
+  runAsUser: 1000
 
 # Settings to configure elasticsearch host requirements
 elasticsearch:
+  # DEPRECATED: Use initSysctl.enabled instead
   configureNode: true
   bootstrapChecks: true
 
@@ -40,6 +52,8 @@ service:
   # loadBalancerSourceRanges:
   #   - 0.0.0.0/0
   loadBalancerIP: 192.168.137.73
+  # You can set the port to be exposed when type is NodePort or LoadBalancer.
+  # nodePort: 30000
 ingress:
   enabled: true
   # Used to create an Ingress record.
@@ -68,7 +82,7 @@ ingress:
 
 # Affinity for pod assignment
 # Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
-affinity: []
+affinity: {}
 
 # Tolerations for pod assignment
 # Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
@@ -104,15 +118,73 @@ livenessProbe:
   # If an ingress *path* is defined, it should be reflected here
   # sonar.web.context: /sonarqube
 
-# Sysctl container requires to be run as privileged
-initContainersSecurityContext:
-  privileged: true
+initContainers:
+  # image: busybox:1.32
+  # We allow the init containers to have a separate security context declaration because
+  # the initContainer may not require the same as SonarQube.
+  # securityContext: {}
+  # We allow the init containers to have a separate resources declaration because
+  # the initContainer does not take as much resources.
+  resources: {}
+
+extraInitContainers: {}
+# Extra init containers to e.g. download required artifacts
+#  - name: "prometheus-exporter-downloader"
+#    image: "busybox"
+#    imagePullPolicy: "IfNotPresent"
+#    securityContext:
+#      runAsNonRoot: true
+#    command:
+#      - wget
+#      - "-O"
+#      - "/downloads/jmx_prometheus_javaagent.jar"
+#      - ${JMX_EXPORTER_URL}
+#    volumeMounts:
+#      - name: "downloads"
+#        mountPath: "/downloads"
+
 
 ## Provide a secret containing one or more certificate files in the keys that will be added to cacerts
 ## The cacerts file will be set via SONARQUBE_WEB_JVM_OPTS and SONAR_CE_JAVAOPTS
 ##
 # caCerts:
-#   secret: my-secret
+  # image: adoptopenjdk/openjdk11:alpine
+  # secret: my-secret
+
+initSysctl:
+  enabled: true
+  vmMaxMapCount: 524288
+  fsFileMax: 131072
+  nofile: 131072
+  nproc: 8192
+  # image: busybox:1.32
+  securityContext:
+    privileged: true
+  # resources: {}
+
+# List of plugins to install.
+# For example:
+# plugins:
+#  install:
+#    - "https://github.com/AmadeusITGroup/sonar-stash/releases/download/1.3.0/sonar-stash-plugin-1.3.0.jar"
+#    - "https://github.com/SonarSource/sonar-ldap/releases/download/2.2-RC3/sonar-ldap-plugin-2.2.0.601.jar"
+plugins:
+  install: []
+  lib: []
+
+  # For use behind a corporate proxy when downloading plugins
+  # httpProxy: ""
+  # httpsProxy: ""
+  # noProxy: ""
+
+  # image: rjkernick/alpine-wget:latest
+  # resources: {}
+
+  # .netrc secret file with a key "netrc" to use basic auth while downloading plugins
+  # netrcCreds: ""
+
+  # Set to true to not validate the server's certificate to download plugin
+  noCheckCertificate: false
 
 ## Values to add to SONARQUBE_WEB_JVM_OPTS
 ##
@@ -170,36 +242,6 @@ emptyDir: {}
   # medium: Memory
   # sizeLimit: 16Mi
 
-# List of plugins to install.
-# For example:
-# plugins:
-#  install:
-#    - "https://github.com/AmadeusITGroup/sonar-stash/releases/download/1.3.0/sonar-stash-plugin-1.3.0.jar"
-#    - "https://github.com/SonarSource/sonar-ldap/releases/download/2.2-RC3/sonar-ldap-plugin-2.2.0.601.jar"
-plugins:
-  install:
-    - https://binaries.sonarsource.com/Distribution/sonar-java-plugin/sonar-java-plugin-5.13.1.18282.jar
-    - https://github.com/jensgerdes/sonar-pmd/releases/download/3.2.1/sonar-pmd-plugin-3.2.1.jar
-    - https://github.com/checkstyle/sonar-checkstyle/releases/download/4.21/checkstyle-sonar-plugin-4.21.jar
-    - https://binaries.sonarsource.com/Distribution/sonar-javascript-plugin/sonar-javascript-plugin-5.2.1.7778.jar
-    - https://binaries.sonarsource.com/Distribution/sonar-typescript-plugin/sonar-typescript-plugin-1.9.0.3766.jar
-    - https://binaries.sonarsource.com/Distribution/sonar-jacoco-plugin/sonar-jacoco-plugin-1.0.2.475.jar
-    - https://github.com/SonarSecurityCommunity/dependency-check-sonar-plugin/releases/download/1.2.5/sonar-dependency-check-plugin-1.2.5.jar
-  lib: []
-
-  # For use behind a corporate proxy when downloading plugins
-  # httpProxy: ""
-  # httpsProxy: ""
-
-  # initContainerImage: rjkernick/alpine-wget:latest
-  # initSysctlContainerImage: busybox:1.31
-  # initCertsContainerImage: adoptopenjdk/openjdk11:alpine
-  # initTestContainerImage: dduportal/bats:0.4.0
-  # deleteDefaultPlugins: true
-  resources: {}
-  # We allow the plugins init container to have a separate resources declaration because
-  # the initContainer does not take as much resources.
-
 # A custom sonar.properties file can be provided via dictionary.
 # For example:
 # sonarProperties:
@@ -218,6 +260,9 @@ plugins:
 ## JDBC Database Type; by default postgresql. To use a different Database type, adjust
 jdbcDatabaseType: postgresql
 
+createPostgresqlSecret: true
+# create the postgresql secret in Sonarqube chart, outside of the postgresql chart.
+
 ## Override JDBC URL
 # jdbcUrlOverride: "jdbc:postgresql://myPostgress/myDatabase;socketTimeout=1500"
 
@@ -228,17 +273,51 @@ postgresql:
   enabled: false
   # To use an external PostgreSQL instance, set enabled to false and uncomment
   # the line below:
-  postgresqlServer: "postgresql.devops"
+  postgresqlServer: "postgresql.database"
   # To use an external secret for the password for an external PostgreSQL
   # instance, set enabled to false and provide the name of the secret on the
   # line below:
-  existingSecret: "sonarqube-postgresql-password"
+  # existingSecret: "sonarqube-postgresql-password"
   postgresqlUsername: sonaruser
   # postgresqlPassword:
   postgresqlDatabase: sonardb
   # Specify the TCP port that PostgreSQL should use
   service:
     port: 5432
+  resources:
+    limits:
+      cpu: 2
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 20Gi
+    storageClass:
+  securityContext:
+    # For standard Kubernetes deployment, set enabled=true
+    # If using OpenShift, enabled=false for restricted SCC and enabled=true for anyuid/nonroot SCC
+    enabled: true
+    # fsGroup and runAsUser specifications below are not applied if enabled=false. enabled=false is the required setting for OpenShift "restricted SCC" to work successfully.
+    # postgresql dockerfile sets user as 1001
+    fsGroup: 1001
+    runAsUser: 1001
+  volumePermissions:
+    # For standard Kubernetes deployment, set enabled=false
+    # For OpenShift, set enabled=true and ensure to set volumepermissions.securitycontext.runAsUser below.
+    enabled: false
+    # if using restricted SCC set runAsUser: "auto" and if running under anyuid/nonroot SCC - runAsUser needs to match runAsUser above
+    securityContext:
+      runAsUser: 0
+  shmVolume:
+    chmod:
+      enabled: false
+  serviceAccount:
+    ## If enabled = true, and name is not set, postgreSQL will create a serviceAccount
+    enabled: false
+#    name:
 
 # Additional labels to add to the pods:
 # podLabels:
@@ -248,7 +327,9 @@ podLabels: {}
 # For compatibility with 8.2, leave the default. They changed it back to /opt/sonarqube
 sonarqubeFolder: /opt/sonarqube
 
-enableTests: true
+tests:
+  enabled: true
+  # image: bitnami/minideb-extras
 
 serviceAccount:
   create: true
@@ -283,3 +364,6 @@ account:
   adminPassword: admin
   currentAdminPassword: admin
 # curlContainerImage: curlimages/curl:latest
+# adminJobAnnotations: {}
+
+terminationGracePeriodSeconds: 60

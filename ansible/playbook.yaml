@@ -32,38 +32,35 @@
 
     - name: Add Oteemo Search Repo
       community.kubernetes.helm_repository:
-        name: oteemo
+        name: oteemocharts
         repo_url: "https://oteemo.github.io/charts"
       delegate_to: localhost
 
-    - name: Add sonarqube database
-      community.general.postgresql_db:
-        login_host: 192.168.137.72
-        login_password: '{{ postgrespassword }}'
-        name: sonardb
-
-
-    - name: Add sonarqube database user
-      community.general.postgresql_user:
-        login_host: 192.168.137.72
-        login_password: '{{ postgrespassword }}'
-        db: sonardb
-        name: sonaruser
-        password: '{{ sonarqubepostgrespassword }}'
-        priv: ALL
-
+#    - name: Add sonarqube database
+#      community.general.postgresql_db:
+#        login_host: 192.168.137.72
+#        login_password: '{{ postgrespassword }}'
+#        name: sonardb
+#
+#
+#    - name: Add sonarqube database user
+#      community.general.postgresql_user:
+#        login_host: 192.168.137.72
+#        login_password: '{{ postgrespassword }}'
+#        db: sonardb
+#        name: sonaruser
+#        password: '{{ sonarqubepostgrespassword }}'
+#        priv: ALL
+#
 
     - name: Copy Customization
       copy:
         src: ../sonarqube-values.yaml
         dest: /tmp/
-      delegate_to: localhost
 
     - name: Apply Sonarqube
       command: >
         helm install -n "{{ namespace }}" sonarqube oteemocharts/sonarqube
         -f /tmp/sonarqube-values.yaml
-        --set postgresqlUsername="{{ postgresqlusername }}"
-        --set postgresqlPassword="{{ postgresqlpassword }}"
-        --set postgresqlDatabase="{{ postgresqldatabase }}"
+        --set postgresql.postgresqlPassword="{{ sonarqubepostgrespassword }}"
       delegate_to: localhost
