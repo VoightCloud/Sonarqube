@@ -1,0 +1,74 @@
+- name: Install Openshift Python Library
+  command: pip3 install openshift
+
+- name: Create monitoring namespace
+  community.kubernetes.k8s:
+    name: "{{ namespace }}"
+    api_version: v1
+    kind: namespace
+    state: present
+
+- name: Add Oteemo Search Repo
+  community.kubernetes.helm_repository:
+    name: oteemocharts
+    repo_url: "https://oteemo.github.io/charts"
+
+- name: Apply Postgresql Persistence
+  kubernetes.core.helm:
+    name: "{{ deployment }}-persistence"
+    chart_ref: ./roles/sonarqube/files/persistence
+    release_namespace: "{{ namespace }}"
+
+- name: Apply Sonarqube
+  kubernetes.core.helm:
+    name: "{{ deployment }}"
+    chart_ref: oteemocharts/sonarqube
+    release_namespace: "{{ namespace }}"
+    release_values:
+      image:
+        tag: 8.2-community
+      service:
+        type: LoadBalancer
+        loadBalancerIP: 192.168.137.73
+      ingress:
+        enabled: true
+        hosts:
+          - name: sonarqube.voight.org
+            path: /
+        tls:
+          - secretName: site-cert
+            hosts:
+              - sonarqube.voight.org
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      jvmOpts: "-Xms512m -Xmx512m"
+      annotations:
+        fluentbit.io/parser: sonarqube
+      persistence:
+        enabled: true
+        existingClaim: "sonar-pvc"
+        storageClass: ""
+        size: 200Gi
+      postgresql:
+        enabled: false
+        postgresqlServer: "postgresql.database"
+        postgresqlUsername: "sonaruser"
+        postgresqlPassword: "{{ sonarqubepostgrespassword }}"
+        postgresqlDatabase: sonardb
+      serviceAccount:
+        create: true
+        name: sonarqube-sa
+      account:
+        adminPassword: "{{ sonarqubeadminpassword}}"
+        currentAdminPassword: admin
+#       sonarProperties:
+#         sonar.forceAuthentication: true
+#         sonar.security.realm: LDAP
+#         ldap.url: ldap://openldap.authentication.svc.cluster.local
+#         ldap.authentication: simple
+#         ldap.user.baseDn: cn=users,ou=people,dc=voight,dc=org
+#         ldap.user.request: "(&(uid={login}))"
+#         ldap.user.realNameAttribute: "givenName"
+#         ldap.user.emailAttribute: "mail"
+#         ldap.group.baseDn: "cn=groups,dc=voight,dc=org"
+#         ldap.group.request: "(&(ou={dn}))"
