@@ -11,11 +11,15 @@ spec:
   claimRef:
     name: sonar-pvc
     namespace: devops
-  nfs:
-    server: 192.168.137.3
-    path: "/volume1/Sonarqube"
-  mountOptions:
-    - nfsvers=4.1
+  iscsi:
+    chapAuthSession: false
+    chapAuthDiscovery: false
+    targetPortal: 192.168.137.3:3260
+    iqn: 'iqn.2000-01.com.synology:drive.sonar.402fcc5ed94'
+    lun: 01
+    fsType: 'ext4'
+    readOnly: false
+
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
