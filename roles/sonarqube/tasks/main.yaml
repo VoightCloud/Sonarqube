@@ -19,6 +19,17 @@
     chart_ref: ./roles/sonarqube/files/persistence
     release_namespace: "{{ namespace }}"
 
+- name: Add Voight.org Certificates
+  kubernetes.core.helm:
+    name: "{{ namespace }}-certificates"
+    chart_ref: ./roles/sonarqube/files/certificates
+    release_namespace: "{{ namespace }}"
+    release_values:
+      namespace: "{{ namespace }}"
+      tls:
+        key: "{{ voightorgkey }}"
+        crt: "{{ voightorgcrt }}"
+
 - name: Apply Sonarqube
   kubernetes.core.helm:
     name: "{{ deployment }}"
