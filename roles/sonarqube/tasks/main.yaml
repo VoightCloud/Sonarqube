@@ -72,14 +72,14 @@
       account:
         adminPassword: "{{ sonarqubeadminpassword}}"
         currentAdminPassword: admin
-#       sonarProperties:
-#         sonar.forceAuthentication: true
-#         sonar.security.realm: LDAP
-#         ldap.url: ldap://openldap.authentication.svc.cluster.local
-#         ldap.authentication: simple
-#         ldap.user.baseDn: cn=users,ou=people,dc=voight,dc=org
-#         ldap.user.request: "(&(uid={login}))"
-#         ldap.user.realNameAttribute: "givenName"
-#         ldap.user.emailAttribute: "mail"
-#         ldap.group.baseDn: "cn=groups,dc=voight,dc=org"
-#         ldap.group.request: "(&(ou={dn}))"
+      sonarProperties:
+        sonar.forceAuthentication: true
+        sonar.security.realm: LDAP
+        ldap.url: ldap://openldap.authentication.svc.cluster.local
+        ldap.authentication: simple
+        ldap.user.baseDn: ou=people,dc=voight,dc=org
+        ldap.user.request: "(&(objectClass=inetOrgPerson)(uid={login}))"
+        ldap.user.realNameAttribute: "givenName"
+        ldap.user.emailAttribute: "mail"
+        ldap.group.baseDn: "ou=groups,dc=voight,dc=org"
+        ldap.group.request: "(&(objectClass=posixGroup)(cn=devops)(memberUid={login}))"
